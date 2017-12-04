@@ -39,11 +39,9 @@ init({Runner, Callback}) ->
     {ok, #state{ runner = Runner, callback = Callback }}.
 
 handle_call(stop, _From, State) ->
-    error_logger:info_msg("Job worker ~p shutting down...~n", [self()]),
     {stop, normal, ok, State}.
 
 handle_cast({process, Item, StartTime, JobState}, S) ->
-    error_logger:info_msg("Processing item with worker ~p~n", [self()]),
 
     Callback = S#state.callback,
     Continue = try

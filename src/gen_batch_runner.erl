@@ -63,7 +63,6 @@ worker_ready(Pid, WorkerPid, Continue) ->
 %%%===================================================================
 
 init([Callback]) ->
-    error_logger:info_msg("Job runner ~p (~p) starting up...~n", [Callback, self()]),
     {ok, ready, #state{ callback = Callback,
                         active = orddict:new(),
                         results = []}}.
@@ -115,7 +114,6 @@ running({worker_ready, WorkerPid, {result, Result}},
 running({worker_ready, WorkerPid, stop}, #state{callback = Callback, job_state = JobState} = S) ->
     Active = stop_worker(WorkerPid, S),
     spawn(Callback, job_stopping, [JobState]),
-    error_logger:info_msg("Job runner ~p (~p) shutting down...~n", [Callback, self()]),
     wind_down(S#state{ items = queue:new(), active = Active, reason = stopped }).
 
 complete({worker_ready, WorkerPid, {result, Result}}, #state{results = Results} = S) ->
@@ -135,7 +133,6 @@ handle_info({'DOWN', _, process, WorkerPid, shutdown}, _StateName, S) ->
   %% This worker has been shanked by its supervisor
   %% More than likely the supervisor has crashed/restarted and we
   %% cannot continue processing the job since there are no more workers
-  error_logger:warning_msg("Worker ~p shutdown~n", [WorkerPid]),
   {Item, StartTime, Active} = clear_worker(WorkerPid, S),
 
   Callback = S#state.callback,
@@ -144,7 +141,6 @@ handle_info({'DOWN', _, process, WorkerPid, shutdown}, _StateName, S) ->
   wind_down(S#state{ active = Active, reason = stopped });
 
 handle_info({'DOWN', _, process, WorkerPid, Info}, StateName, S) ->
-  error_logger:warning_msg("Worker ~p crashed: ~p~n", [WorkerPid, Info]),
   {Item, StartTime, Active} = clear_worker(WorkerPid, S),
 
   Callback = S#state.callback,
@@ -159,7 +155,6 @@ handle_info(_Event, StateName, State) ->
 
 handle_event(stop, _StateName, #state{callback = Callback} = S) ->
   spawn(Callback, job_stopping, [S#state.job_state]),
-  error_logger:info_msg("Job runner ~p (~p) shutting down...~n", [Callback, self()]),
   wind_down(S#state{ items = queue:new(), reason = stopped });
 
 handle_event(_Event, _StateName, State) ->
@@ -182,7 +177,6 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 start_workers(NumWorkers, Callback) ->
     lists:foreach(fun(_) ->
                       {ok, Pid} = gen_batch_worker_sup:start_worker(self(), Callback),
-                      error_logger:info_msg("Runner ~p starting job worker with pid ~p~n", [self(), Pid]),
                       erlang:monitor(process, Pid)
                   end, lists:seq(1, NumWorkers)).
 
@@ -204,7 +198,6 @@ reply(From, Reply) ->
 wind_down(#state{ callback = Callback, reason = Reason, results = Results } = S) ->
     case orddict:size(S#state.active) of
         0 ->
-            error_logger:info_msg("Job ~p (~p) ~p.~n", [Callback, self(), Reason]),
             spawn(Callback, job_complete, [Reason, S#state.job_state]),
           case length(Results) of
             0 ->
