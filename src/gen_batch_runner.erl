@@ -96,7 +96,6 @@ running({worker_ready, WorkerPid, ok}, #state{items = Items, job_state = JobStat
             Active = orddict:store(WorkerPid, {Item, StartTime}, S#state.active),
             {next_state, running, S#state{ items = I2, active = Active }}
     end;
-
 running({worker_ready, WorkerPid, {result, Result}},
     #state{items = Items, job_state = JobState, results = Results} = S) ->
     case queue:out(Items) of
@@ -110,11 +109,14 @@ running({worker_ready, WorkerPid, {result, Result}},
             Active = orddict:store(WorkerPid, {Item, StartTime}, S#state.active),
             {next_state, running, S#state{ items = I2, active = Active, results = [Result | Results]}}
     end;
-
 running({worker_ready, WorkerPid, stop}, #state{callback = Callback, job_state = JobState} = S) ->
     Active = stop_worker(WorkerPid, S),
     spawn(Callback, job_stopping, [JobState]),
-    wind_down(S#state{ items = queue:new(), active = Active, reason = stopped }).
+    wind_down(S#state{ items = queue:new(), active = Active, reason = stopped });
+running({worker_ready, WorkerPid, {stop, Reason}}, #state{callback = Callback, job_state = JobState} = S) ->
+    Active = stop_worker(WorkerPid, S),
+    spawn(Callback, job_stopping, [JobState]),
+    wind_down(S#state{ items = queue:new(), active = Active, reason = Reason }).
 
 complete({worker_ready, WorkerPid, {result, Result}}, #state{results = Results} = S) ->
     Active = stop_worker(WorkerPid, S),
@@ -199,12 +201,12 @@ wind_down(#state{ callback = Callback, reason = Reason, results = Results } = S)
     case orddict:size(S#state.active) of
         0 ->
             spawn(Callback, job_complete, [Reason, S#state.job_state]),
-          case length(Results) of
-            0 ->
-              reply(S#state.from, ok);
-            _ ->
-              reply(S#state.from, {results, Results})
-          end,
+            case Reason of
+              complete ->
+                reply(S#state.from, {ok, Results});
+              Reason ->
+                reply(S#state.from, {Reason, Results})
+            end,
             {stop, normal, S};
 
         _ ->
