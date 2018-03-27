@@ -19,7 +19,7 @@
                  items       :: term(), % queue
                  active      :: term(), % orddict
                  from        :: pid() | undefined,
-                 reason      :: undefined | stopped | complete,
+                 reason      :: undefined | stopped | complete | atom(),
                  job_state   :: gen_batch:job_state(),
                  results     :: list()}). % defined by callback module
 
