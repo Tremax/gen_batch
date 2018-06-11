@@ -121,12 +121,10 @@ running({worker_ready, WorkerPid, {stop, Reason}}, #state{callback = Callback, j
 complete({worker_ready, WorkerPid, {result, Result}}, #state{results = Results} = S) ->
     Active = stop_worker(WorkerPid, S),
     wind_down(S#state{ active = Active, results = [Result | Results]});
-
 complete({worker_ready, WorkerPid, {stop, Reason}}, S) ->
     Active = stop_worker(WorkerPid, S),
     wind_down(S#state{ active = Active, reason = Reason});
-
-complete({worker_ready, WorkerPid, A}, S) ->
+complete({worker_ready, WorkerPid, _A}, S) ->
     Active = stop_worker(WorkerPid, S),
     wind_down(S#state{ active = Active }).
 
@@ -134,18 +132,14 @@ handle_info({'DOWN', _, process, _Pid, normal}, StateName, S) ->
     %% This is a worker we told to stop
     %% Nothing to see here...move along
     {next_state, StateName, S};
-
 handle_info({'DOWN', _, process, WorkerPid, shutdown}, _StateName, S) ->
   %% This worker has been shanked by its supervisor
   %% More than likely the supervisor has crashed/restarted and we
   %% cannot continue processing the job since there are no more workers
   {Item, StartTime, Active} = clear_worker(WorkerPid, S),
-
   Callback = S#state.callback,
   spawn(Callback, worker_died, [Item, WorkerPid, StartTime, shutdown, S#state.job_state]),
-
   wind_down(S#state{ active = Active, reason = stopped });
-
 handle_info({'DOWN', _, process, WorkerPid, Info}, StateName, S) ->
   {Item, StartTime, Active} = clear_worker(WorkerPid, S),
   Callback = S#state.callback,
