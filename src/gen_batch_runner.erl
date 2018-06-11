@@ -122,7 +122,11 @@ complete({worker_ready, WorkerPid, {result, Result}}, #state{results = Results} 
     Active = stop_worker(WorkerPid, S),
     wind_down(S#state{ active = Active, results = [Result | Results]});
 
-complete({worker_ready, WorkerPid, _}, S) ->
+complete({worker_ready, WorkerPid, {stop, Reason}}, S) ->
+    Active = stop_worker(WorkerPid, S),
+    wind_down(S#state{ active = Active, reason = Reason});
+
+complete({worker_ready, WorkerPid, A}, S) ->
     Active = stop_worker(WorkerPid, S),
     wind_down(S#state{ active = Active }).
 
@@ -144,7 +148,6 @@ handle_info({'DOWN', _, process, WorkerPid, shutdown}, _StateName, S) ->
 
 handle_info({'DOWN', _, process, WorkerPid, Info}, StateName, S) ->
   {Item, StartTime, Active} = clear_worker(WorkerPid, S),
-
   Callback = S#state.callback,
   spawn(Callback, worker_died, [Item, WorkerPid, StartTime, Info, S#state.job_state]),
 

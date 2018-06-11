@@ -12,15 +12,15 @@ job_runner_test_() ->
   end,
   [
   {"Normal jobs should complete successfully",
-  ?_assertEqual(ok, gen_batch:sync_run_job(batch_normal, []))},
+  ?_assertEqual({ok,[]}, gen_batch:sync_run_job(batch_normal, []))},
   {"Exceptions thrown from callback modules shouldn't crash the job",
-  ?_assertEqual(ok, gen_batch:sync_run_job(batch_throw, []))},
+  ?_assertEqual({ok, []}, gen_batch:sync_run_job(batch_throw, []))},
   {"Errors in callback modules shouldn't crash the job",
-  ?_assertEqual(ok, gen_batch:sync_run_job(batch_crash, []))},
+  ?_assertEqual({ok, []}, gen_batch:sync_run_job(batch_crash, []))},
   {"Errors in callback module init should be returned to the caller",
   ?_assertEqual({error, testing}, gen_batch:sync_run_job(batch_init_fail, []))},
   {"The runner should stop when a worker asks",
-  ?_assertEqual(ok, gen_batch:sync_run_job(batch_worker_stop, []))},
+  ?_assertEqual({stopped, []}, gen_batch:sync_run_job(batch_worker_stop, []))},
   {"The runner should stop when caller asks",
   ?_test(begin
     {ok, Pid} = supervisor:start_child(gen_batch_runner_sup, [batch_wait]),
@@ -31,11 +31,24 @@ job_runner_test_() ->
     ?assertNot(is_process_alive(Pid))
   end
   )},
+  {"The runner should stop, return processed items and expose reason",
+  ?_test(begin
+    {process_failed, Processed} = gen_batch:sync_run_job(batch_worker_stop_half_done, [2]),
+    ?assertEqual([1,2,4], lists:sort(Processed)),
+    {process_failed, Processed2} = gen_batch:sync_run_job(batch_worker_stop_half_done, [3]),
+    ?assertEqual([1,2,4,5], lists:sort(Processed2)),
+    {process_failed, Processed3} = gen_batch:sync_run_job(batch_worker_stop_half_done, [1]),
+    ?assertEqual([1,2], lists:sort(Processed3)),
+    %% workers > task items
+    {process_failed, Processed4} = gen_batch:sync_run_job(batch_worker_stop_half_done, [11]),
+    ?assertEqual([1,2,4,5,6,7,8,9,10], lists:sort(Processed4))
+  end
+  )},
   {"The runner should continue when worker supervisor dies",
-  ?_assertEqual(ok, gen_batch:sync_run_job(batch_kill_sup, []))},
+  ?_assertEqual({ok, []}, gen_batch:sync_run_job(batch_kill_sup, []))},
   {"The workers should be able to return results that are aggregated and replied back on synchronous calls",
   ?_test(begin
-    {results, Results} = gen_batch:sync_run_job(batch_worker_results, []),
+    {ok, Results} = gen_batch:sync_run_job(batch_worker_results, []),
     ?_assertEqual([1, 2, 3], lists:sort(Results))
    end
   )},

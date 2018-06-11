@@ -16,7 +16,7 @@ run_job_test_() ->
     end,
     [{"returns results from a sync job",
     ?_test(begin
-      {results, Results} = gen_batch:sync_run_job(batch_worker_results, []),
+      {ok, Results} = gen_batch:sync_run_job(batch_worker_results, []),
       Sorted = lists:sort(Results),
       Expected = [1, 2, 3],
       ?assertEqual(Expected, Sorted)
